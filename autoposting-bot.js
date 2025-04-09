@@ -773,4 +773,133 @@ function prosesCallback(cb) {
         nama = cb.from.first_name + (cb.from.last_name ? ' ' + cb.from.last_name : '');
       } else if (cb.message && cb.message.chat && cb.message.chat.first_name) {
         nama = cb.message.chat.first_name + (cb.message.chat.last_name ? ' ' + cb.message.chat.last_name : '');
-        console.log("Menggunakan nama
+        console.log("Menggunakan nama dari cb.message.chat (info)");
+      } else {
+        nama = "Pengguna";
+        console.warn("Informasi nama pengguna tidak ditemukan dalam objek cb (info).");
+        console.log(cb);
+      }
+
+      var infoPesan = "<b>Informasi Bot:</b>\n\n";
+      infoPesan += "------------------------\n";
+      infoPesan += " Dibuat dengan Google Apps Script\n";
+      infoPesan += "Versi: 8.0.5.5\n";
+      infoPesan += ` Pengembang: [ <b>${nama}</b> ]\n`;
+      infoPesan += "------------------------";
+
+      bot.telegram.answerCallbackQuery(cb.id, "Informasi ditampilkan!", false);
+      bot.telegram.sendMessage(cb.message.chat.id, infoPesan, {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "⬅️ Kembali ke Menu Utama", callback_data: "menu_click" }]
+          ]
+        }
+      });
+    } else if (/bantuan_click/i.exec(cb.data)) {
+      let nama = "";
+      if (cb.from && cb.from.first_name) {
+        nama = cb.from.first_name + (cb.from.last_name ? ' ' + cb.from.last_name : '');
+      } else if (cb.message && cb.message.chat && cb.message.chat.first_name) {
+        nama = cb.message.chat.first_name + (cb.message.chat.last_name ? ' ' + cb.message.chat.last_name : '');
+        console.log("Menggunakan nama dari cb.message.chat (bantuan)");
+      } else {
+        nama = "Pengguna";
+        console.warn("Informasi nama pengguna tidak ditemukan dalam objek cb (bantuan).");
+        console.log(cb);
+      }
+
+      var bantuanPesan = "<b>Bantuan:</b>\n\n";
+      bantuanPesan += "------------------------\n";
+      bantuanPesan += " Ketik perintah yang tersedia untuk menggunakan bot.telegram.\n";
+      bantuanPesan += " Hubungi admin jika ada masalah.\n";
+      bantuanPesan += `Jika kamu Tahu adminnya Bernama <b>${nama}</b>.\n`;
+      bantuanPesan += "------------------------";
+
+      bot.telegram.answerCallbackQuery(cb.id, "Bantuan ditampilkan!", false);
+      bot.telegram.sendMessage(cb.message.chat.id, bantuanPesan, {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "⬅️ Kembali ke Menu Utama", callback_data: "menu_click" }]
+          ]
+        }
+      });
+    } else if (cb.data === "menu_click") {
+      var pesanMenu = "<b>Menu Utama:</b>\n\n";
+      pesanMenu += "Silakan pilih perintah:\n";
+      pesanMenu += "➡️ /start\n";
+      pesanMenu += "➡️ /postingan\n";
+      pesanMenu += "➡️ /short urlkamu\n";
+      pesanMenu += "➡️ /autoposting pesan anda\n";
+      pesanMenu += "➡️ /stopautoposting\n";
+      pesanMenu += "\nAtau gunakan tombol di bawah ini:";
+
+      bot.telegram.answerCallbackQuery(cb.id, "Kembali ke menu utama!", false);
+      bot.telegram.sendMessage(cb.message.chat.id, pesanMenu, {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "ℹ️ Informasi", callback_data: "info_click" }, { text: "❓ Bantuan", callback_data: "bantuan_click" }]
+          ]
+        }
+      });
+    } else {
+      bot.telegram.answerCallbackQuery(cb.id, "Callback tidak dikenali.", true);
+    }
+  } catch (error) {
+    Logger.log("Error in prosesCallback: " + error);
+    bot.telegram.answerCallbackQuery(cb.id, "Terjadi kesalahan.", true);
+    bot.telegram.sendMessage(adminBot, "Error in prosesCallback: " + error);
+  }
+}
+
+// --- Fungsi Webhook ---
+// kamu bisa kunjungi di: https://sfl.gl/iJ6BU
+function setWebhook() {
+  let url = "https://script.google.com/macros/s/AKfycbxVj6EJJY7UULV0vC1lXvALz3_B-pLJ2zmjj9xFoDLYjneesmk6Gsa42JNmr5mLMB14-g/exec"; // <-- GANTI URL INI!
+  try {
+    let result = bot.telegram.setWebhook(url);
+    Logger.log("Set Webhook Result: " + JSON.stringify(result));
+    if (result.ok) {
+      Logger.log("Webhook berhasil diatur ke: " + url);
+      // Anda bisa mengirim konfirmasi ke admin jika perlu
+      // bot.telegram.sendMessage(adminBot, "Webhook berhasil diatur ke: " + url);
+    } else {
+      Logger.log("Gagal mengatur webhook: " + result.description);
+      // bot.telegram.sendMessage(adminBot, "Gagal mengatur webhook: " + result.description);
+    }
+  } catch (error) {
+    Logger.log("Error setting webhook: " + error.message);
+    // bot.telegram.sendMessage(adminBot, "Error setting webhook: " + error.message);
+  }
+}
+
+function getWebhookInfo() {
+  try {
+    let result = bot.telegram.getWebhookInfo();
+    Logger.log("Webhook Info: " + JSON.stringify(result, null, 2));
+    // Kirim info ke admin jika perlu
+    // bot.telegram.sendMessage(adminBot, "Webhook Info:\n<pre>" + JSON.stringify(result, null, 2) + "</pre>", {parse_mode: "HTML"});
+  } catch (error) {
+    Logger.log("Error getting webhook info: " + error.message);
+    // bot.telegram.sendMessage(adminBot, "Error getting webhook info: " + error.message);
+  }
+}
+
+function deleteWebhook() {
+  try {
+    let result = bot.telegram.deleteWebhook(); // deleteWebhook biasanya tidak butuh argumen di library standar
+    Logger.log("Delete Webhook Result: " + JSON.stringify(result));
+    if (result.ok) {
+      Logger.log("Webhook berhasil dihapus.");
+      // bot.telegram.sendMessage(adminBot, "Webhook berhasil dihapus.");
+    } else {
+      Logger.log("Gagal menghapus webhook: " + result.description);
+      // bot.telegram.sendMessage(adminBot, "Gagal menghapus webhook: " + result.description);
+    }
+  } catch (error) {
+    Logger.log("Error deleting webhook: " + error.message);
+    // bot.telegram.sendMessage(adminBot, "Error deleting webhook: " + error.message);
+  }
+}
