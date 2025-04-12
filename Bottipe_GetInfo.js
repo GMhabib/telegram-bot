@@ -296,17 +296,50 @@ function doPost(e) {
           }
         }
       } else if (text.startsWith('/connect ') && isAdmin(chatId)) {
-        // ... (kode untuk /connect tidak diubah)
+        const targets = text.substring('/connect '.length).trim().split(/\s+/);
+        let connectedTargets = [];
+        const existingConnections = userConnections.getProperty(`admin_${chatId}_connections`);
+        if (existingConnections) {
+          connectedTargets = JSON.parse(existingConnections);
+        }
+        targets.forEach(target => {
+          if (!connectedTargets.includes(target)) {
+            connectedTargets.push(target);
+          }
+        });
+        userConnections.setProperty(`admin_${chatId}_connections`, JSON.stringify(connectedTargets));
+        Logger.log(`Admin ${chatId} terhubung ke: ${connectedTargets.join(', ')}`);
+        sendMessage(chatId, `Terhubung ke: <b>${connectedTargets.join(', ')}</b>.`, 'HTML');
       } else if (text === '/connection' && isAdmin(chatId)) {
-        // ... (kode untuk /connection tidak diubah)
+        const connectedList = userConnections.getProperty(`admin_${chatId}_connections`);
+        if (connectedList) {
+          sendMessage(chatId, `Saat ini terhubung ke: <b>${JSON.parse(connectedList).join(', ')}</b>.`, 'HTML');
+        } else {
+          sendMessage(chatId, `Saat ini tidak ada koneksi yang aktif.`, 'HTML');
+        }
       } else if (text === '/disconnect' && isAdmin(chatId)) {
-        // ... (kode untuk /disconnect tidak diubah)
+        userConnections.deleteProperty(`admin_${chatId}_connections`);
+        Logger.log(`Admin ${chatId} memutuskan semua koneksi.`);
+        sendMessage(chatId, 'Semua koneksi telah diputuskan.');
       } else if (text === '/reconnect' && isAdmin(chatId)) {
-        // ... (kode untuk /reconnect tidak diubah)
+        const previouslyConnected = userConnections.getProperty(`admin_${chatId}_connections`);
+        if (previouslyConnected) {
+          sendMessage(chatId, `Mencoba terhubung kembali ke: <b>${JSON.parse(previouslyConnected).join(', ')}</b>.`, 'HTML');
+          // Anda mungkin ingin menambahkan logika di sini untuk benar-benar "melakukan sesuatu"
+          // dengan koneksi yang tersimpan, misalnya mengirim pesan tes.
+          // Saat ini, perintah ini hanya memberitahu admin daftar koneksi sebelumnya.
+        } else {
+          sendMessage(chatId, 'Tidak ada koneksi sebelumnya untuk dihubungkan kembali.');
+        }
       } else if (text === '/kirimid') {
-        // ... (kode untuk /kirimid tidak diubah)
+        const connectedList = userConnections.getProperty(`admin_${chatId}_connections`);
+        if (connectedList && JSON.parse(connectedList).length > 0) {
+          sendMessage(chatId, `ID/Username yang saat ini terhubung adalah: <code>${JSON.parse(connectedList).join(', ')}</code>`, 'HTML');
+        } else {
+          sendMessage(chatId, `Admin <code>${chatId}</code> belum terhubung ke chat mana pun.`, 'HTML');
+        }
       } else if (/^-638\d+$/.test(text)) {
-        // ... (kode untuk format angka tidak diubah)
+        sendMessage(chatId, `<code>${text}</code>`, 'HTML');
       } else if (text.startsWith('/unblock ') && isAdmin(chatId)) {
         const target = text.substring('/unblock '.length).trim();
         if (!isNaN(parseInt(target))) {
