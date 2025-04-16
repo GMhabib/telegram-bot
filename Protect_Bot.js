@@ -299,7 +299,7 @@ async function doPost(e) {
           `<b>Username Bot:</b> <code>${BOT_USERNAME}</code>\n` +
           `<b>Jenis Bot:</b> Bot Biasa`;
         sendMessage(chatId, reply, 'HTML');
-      } else if (text.startsWith('/protect ') && isAdmin(chatId)) {
+      } else if (text.startsWith('/protect ')) {
         const parts = text.split(' ');
         if (parts.length === 2) {
           const target = parts[1].trim();
@@ -327,27 +327,44 @@ async function doPost(e) {
           sendMessage(chatId, 'Penggunaan perintah <code>/protect</code> yang benar adalah dengan membalas pesan pengguna atau menggunakan <code>/protect [ID Pengguna]</code>.', 'HTML');
         }
       } else if (text === '/unprotect' && isAdmin(chatId)) {
-        if (replyToMessage) {
-          const targetUserId = replyToMessage.from.id;
-          if (unprotectUser(targetUserId)) {
-            sendMessage(chatId, `Pengguna dengan ID <code>${targetUserId}</code> (mereply pesan ini) telah dihapus dari daftar perlindungan anti-ban.`, 'HTML');
-          } else {
-            sendMessage(chatId, `Pengguna dengan ID <code>${targetUserId}</code> (mereply pesan ini) tidak ditemukan dalam daftar perlindungan anti-ban.`, 'HTML');
-          }
-        } else if (text.startsWith('/unprotect ')) {
-          const target = text.substring('/unprotect '.length).trim();
-          if (!isNaN(parseInt(target))) {
-            const targetUserId = parseInt(target);
+        const protectedList = antiBanUsers.getProperty('protected_list');
+        if (protectedList) {
+          antiBanUsers.deleteProperty('protected_list');
+          sendMessage(chatId, 'Semua pengguna telah dihapus dari daftar perlindungan anti-ban.', 'HTML');
+          Logger.log(`Admin ${chatId} menghapus semua pengguna dari daftar perlindungan.`);
+        } else {
+          sendMessage(chatId, 'Daftar perlindungan anti-ban saat ini kosong.', 'HTML');
+        }
+      } else if (text === '/unprotect' && isAdmin(chatId)) {
+        const protectedList = antiBanUsers.getProperty('protected_list');
+        if (protectedList) {
+          antiBanUsers.deleteProperty('protected_list');
+          sendMessage(chatId, 'Semua pengguna telah dihapus dari daftar perlindungan anti-ban.', 'HTML');
+          Logger.log(`Admin ${chatId} menghapus semua pengguna dari daftar perlindungan.`);
+        } else {
+          sendMessage(chatId, 'Daftar perlindungan anti-ban saat ini kosong.', 'HTML');
+        }
+      } else if (text.startsWith('/unprotect ')) {
+        const target = text.substring('/unprotect '.length).trim();
+        if (!isNaN(parseInt(target))) {
+          const targetUserId = parseInt(target);
+          if (targetUserId === userId) {
+            if (unprotectUser(targetUserId)) {
+              sendMessage(chatId, `Anda dengan ID <code>${targetUserId}</code> telah dihapus dari daftar perlindungan anti-ban.`, 'HTML');
+            } else {
+              sendMessage(chatId, `Anda dengan ID <code>${targetUserId}</code> tidak ditemukan dalam daftar perlindungan anti-ban.`, 'HTML');
+            }
+          } else if (isAdmin(chatId)) {
             if (unprotectUser(targetUserId)) {
               sendMessage(chatId, `Pengguna dengan ID <code>${targetUserId}</code> telah dihapus dari daftar perlindungan anti-ban.`, 'HTML');
             } else {
               sendMessage(chatId, `Pengguna dengan ID <code>${targetUserId}</code> tidak ditemukan dalam daftar perlindungan anti-ban.`, 'HTML');
             }
           } else {
-            sendMessage(chatId, 'Penggunaan perintah <code>/unprotect</code> yang benar adalah dengan membalas pesan pengguna atau menggunakan <code>/unprotect [ID Pengguna]</code>.', 'HTML');
+            sendMessage(chatId, 'Maaf, hanya admin yang dapat menghapus pengguna lain dari daftar perlindungan.', 'HTML');
           }
         } else {
-          sendMessage(chatId, 'Balas pesan pengguna yang ingin Anda hapus dari perlindungan atau gunakan format <code>/unprotect [ID Pengguna]</code>.', 'HTML');
+          sendMessage(chatId, 'Penggunaan perintah <code>/unprotect</code> yang benar adalah dengan membalas pesan pengguna atau menggunakan <code>/unprotect [ID Pengguna]</code>.', 'HTML');
         }
       } else if (text === '/listprotect' && isAdmin(chatId)) {
         const protectedListMessage = getProtectedList(chatId);
@@ -377,13 +394,19 @@ async function doPost(e) {
       } else {
         // Jika tidak ada perintah yang dikenali dan pengguna bukan admin
         if (!isAdmin(chatId)) {
-          blockUser(userId);
-          const reportMessage = `🚨 Pengguna Diblokir Otomatis 🚨\nPengguna ID: <code>${userId}</code>\nNama: ${firstName}\nUsername: ${chatUsername}\nChat ID: <code>${chatId}</code>\nTelah mengirimkan pesan yang tidak dikenali sebagai perintah.\nTindakan: Diblokir oleh bot. Disarankan untuk dilaporkan ke ${SPAM_BOT_USERNAME} dan ${MISS_ROSE_USERNAME}.`;
-          sendTelegramAdminMessage(reportMessage);
-          sendMessage(chatId, `Pesan Anda tidak dikenali sebagai perintah yang valid. Anda telah diblokir oleh bot.`);
-          // Opsi untuk mencoba kick pengguna dari grup (jika dalam grup)
-          if (chatType === 'group' || chatType === 'supergroup') {
-            kickChatMember(chatId, userId);
+          // Periksa apakah pengguna ada dalam daftar perlindungan
+          if (!isProtected(userId)) {
+            blockUser(userId);
+            const reportMessage = `🚨 Pengguna Diblokir Otomatis 🚨\nPengguna ID: <code>${userId}</code>\nNama: ${firstName}\nUsername: ${chatUsername}\nChat ID: <code>${chatId}</code>\nTelah mengirimkan pesan yang tidak dikenali sebagai perintah.\nTindakan: Diblokir oleh bot. Disarankan untuk dilaporkan ke ${SPAM_BOT_USERNAME} dan ${MISS_ROSE_USERNAME}.`;
+            sendTelegramAdminMessage(reportMessage);
+            sendMessage(chatId, `silahkan buat perintah, /protect ${userId}. nanti kamu aman tidak terkena banned bot.`,'HTML');
+            // Opsi untuk mencoba kick pengguna dari grup (jika dalam grup)
+            if (chatType === 'group' || chatType === 'supergroup') {
+              kickChatMember(chatId, userId);
+            }
+          } else {
+            Logger.log(`Pengguna ${userId} mengirim pesan tidak dikenal tetapi dilindungi, tidak diblokir.`);
+     //       sendMessage(chatId, `Pesan Anda tidak dikenali sebagai perintah yang valid.`);
           }
         } else {
           // Jika admin mengirim pesan yang tidak dikenali
