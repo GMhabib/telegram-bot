@@ -10,9 +10,25 @@ const MISS_ROSE_USERNAME = '@MissRose_bot'; // Username bot Telegram Miss Rose
 const userConnections = PropertiesService.getUserProperties();
 const blockedUsers = PropertiesService.getUserProperties(); // Properti untuk menyimpan daftar pengguna yang diblokir
 const antiBanUsers = PropertiesService.getUserProperties(); // Properti untuk menyimpan daftar pengguna yang dilindungi dari ban
+function initializeAdminChatIds() {
+  const adminChatIds = [ADMIN_CHAT_IDS_KAMU]; // Ganti dengan ID chat admin Anda
+  PropertiesService.getScriptProperties().setProperty('ADMIN_CHAT_IDS', JSON.stringify(adminChatIds));
+  Logger.log('ID Chat Admin telah disimpan di Script Properties.');
+}
 
 function isAdmin(chatId) {
   return ADMIN_CHAT_IDS.includes(chatId);
+}
+function sendTelegramAdminMessage(message) {
+  const adminChatIdsString = PropertiesService.getScriptProperties().getProperty('ADMIN_CHAT_IDS');
+  if (adminChatIdsString) {
+    const adminChatIds = JSON.parse(adminChatIdsString);
+    adminChatIds.forEach(adminId => {
+      sendMessage(adminId, message, 'HTML');
+    });
+  } else {
+    Logger.log('Properti ADMIN_CHAT_IDS tidak ditemukan.');
+  }
 }
 
 function isProtected(userId) {
@@ -191,17 +207,48 @@ async function doPost(e) {
       const chatType = contents.message.chat.type;
       const chatUsername = contents.message.chat.username ? `@${contents.message.chat.username}` : 'Tidak ada';
       const messageId = contents.message.message_id;
-
       // Periksa apakah pengguna diblokir
       if (isBlocked(userId) && !isAdmin(chatId)) {
         Logger.log(`Pengguna ${userId} diblokir, pesan tidak diproses.`);
         return ContentService.createTextOutput(JSON.stringify({ "method": "post" })).setMimeType(ContentService.MimeType.JSON);
       }
-
       // Fitur Anti Ban Permanen (Hanya Logika di Bot Sendiri)
       if (isProtected(userId)) {
         Logger.log(`Pengguna ${userId} dilindungi dari ban.`);
       }
+// **Anti Locked Forward dengan Auto Block & Kick Bot**
+ //     if (contents.message.forward_from_chat && contents.message.forward_from_chat.has_protected_content) {
+   //     try {
+   //       const chatId = contents.message.chat.id;
+      //    const messageId = contents.message.message_id;
+    //      const userId = contents.message.from.id;
+
+     //     await deleteMessage(chatId, messageId);
+   //       Logger.log(`Pesan forward dari chat yang dilindungi dihapus: ${messageId} dari pengguna ${userId} di chat ${chatId}`);
+
+   //       try {
+            // Blokir pengguna yang mengirim forward terkunci
+   //         await blockChatMember(chatId, userId);
+    //        Logger.log(`Pengguna ${userId} diblokir karena mengirim forward dari chat yang dilindungi di chat ${chatId}`);
+
+   //         try {
+              // Keluarkan bot dari grup
+     //         await leaveChat(chatId);
+     //         Logger.log(`Bot dikeluarkan dari chat ${chatId} karena mendeteksi forward terkunci.`);
+     //         return; // Hentikan pemrosesan lebih lanjut setelah bot keluar
+   //         } catch (error) {
+    //          Logger.error(`Gagal mengeluarkan bot dari chat ${chatId}: ${error}`);
+      //        return; // Tetap hentikan pemrosesan meskipun gagal keluar
+      //      }
+     //     } catch (error) {
+     //       Logger.error(`Gagal memblokir pengguna ${userId} di chat ${chatId}: ${error}`);
+     //       return; // Tetap hentikan pemrosesan meskipun gagal memblokir
+    //      }
+   //     } catch (error) {
+     //     Logger.error(`Gagal menghapus pesan forward dari chat yang dilindungi ${messageId}: ${error}`);
+      //    return; // Tetap hentikan pemrosesan meskipun gagal menghapus
+    //    }
+    //  }
       // Filter kata kasar (hanya untuk pesan teks)
       if (text) {
         // **Tambahkan pengecekan format perintah bot sendiri di sini**
@@ -299,6 +346,15 @@ async function doPost(e) {
           `<b>Username Bot:</b> <code>${BOT_USERNAME}</code>\n` +
           `<b>Jenis Bot:</b> Bot Biasa`;
         sendMessage(chatId, reply, 'HTML');
+      // Tambahkan kode untuk menghapus pesan perintah
+        try {
+          await deleteMessage(chatId, messageId);
+          Logger.log(`Berhasil menghapus pesan perintah /start ${messageId} dari chat ${chatId}`);
+        } catch (error) {
+          Logger.log(`Gagal menghapus pesan perintah /start ${messageId}: ${error}`);
+          // Mungkin bot tidak memiliki izin untuk menghapus pesan
+          sendMessage(chatId, `⚠️ Gagal menghapus pesan perintah Anda. Pastikan bot memiliki izin yang cukup.`, 'HTML');
+        }
       } else if (text.startsWith('/protect ')) {
         const parts = text.split(' ');
         if (parts.length === 2) {
@@ -326,12 +382,30 @@ async function doPost(e) {
         } else {
           sendMessage(chatId, 'Penggunaan perintah <code>/protect</code> yang benar adalah dengan membalas pesan pengguna atau menggunakan <code>/protect [ID Pengguna]</code>.', 'HTML');
         }
+                // Tambahkan kode untuk menghapus pesan perintah
+        try {
+          await deleteMessage(chatId, messageId);
+          Logger.log(`Berhasil menghapus pesan perintah /protect ${messageId} dari chat ${chatId}`);
+        } catch (error) {
+          Logger.log(`Gagal menghapus pesan perintah /protect ${messageId}: ${error}`);
+          // Mungkin bot tidak memiliki izin untuk menghapus pesan
+          sendMessage(chatId, `⚠️ Gagal menghapus pesan perintah Anda. Pastikan bot memiliki izin yang cukup.`, 'HTML');
+        }
       } else if (text === '/unprotect' && isAdmin(chatId)) {
         const protectedList = antiBanUsers.getProperty('protected_list');
         if (protectedList) {
           antiBanUsers.deleteProperty('protected_list');
           sendMessage(chatId, 'Semua pengguna telah dihapus dari daftar perlindungan anti-ban.', 'HTML');
           Logger.log(`Admin ${chatId} menghapus semua pengguna dari daftar perlindungan.`);
+           // Tambahkan kode untuk menghapus pesan perintah yang tidak dikenali
+            try {
+              await deleteMessage(chatId, messageId);
+              Logger.log(`Berhasil menghapus pesan tidak dikenal ${messageId} dari pengguna ${userId} di chat ${chatId}`);
+            } catch (error) {
+              Logger.log(`Gagal menghapus pesan tidak dikenal ${messageId}: ${error}`);
+              // Mungkin bot tidak memiliki izin untuk menghapus pesan
+              sendMessage(chatId, `⚠️ Gagal menghapus pesan Anda. Pastikan bot memiliki izin yang cukup.`, 'HTML');
+            }
         } else {
           sendMessage(chatId, 'Daftar perlindungan anti-ban saat ini kosong.', 'HTML');
         }
@@ -366,11 +440,45 @@ async function doPost(e) {
         } else {
           sendMessage(chatId, 'Penggunaan perintah <code>/unprotect</code> yang benar adalah dengan membalas pesan pengguna atau menggunakan <code>/unprotect [ID Pengguna]</code>.', 'HTML');
         }
+      } else if (text.startsWith('/thread ')) {
+        const threadText = text.substring('/thread '.length).trim();
+        if (threadText) {
+          sendMessage(chatId, threadText, 'HTML'); // Kirim pesan sebagai bot
+          Logger.log(`Pengguna ${userId} mengirim thread: ${threadText} di chat ${chatId}`);
+          try {
+            await deleteMessage(chatId, messageId); // Hapus pesan perintah
+            Logger.log(`Berhasil menghapus pesan perintah ${messageId} dari pengguna ${userId} di chat ${chatId}`);
+          } catch (error) {
+            Logger.log(`Gagal menghapus pesan perintah ${messageId}: ${error}`);
+            // Mungkin bot tidak memiliki izin untuk menghapus pesan
+            sendMessage(chatId, `⚠️ Gagal menghapus pesan perintah Anda. Pastikan bot memiliki izin yang cukup.`, 'HTML');
+          }
+        } else {
+          sendMessage(chatId, 'Penggunaan: <code>/thread [teks thread]</code>', 'HTML');
+        }
       } else if (text === '/listprotect' && isAdmin(chatId)) {
         const protectedListMessage = getProtectedList(chatId);
         sendMessage(chatId, protectedListMessage, 'HTML');
+    // Tambahkan kode untuk menghapus pesan perintah yang tidak dikenali
+            try {
+              await deleteMessage(chatId, messageId);
+              Logger.log(`Berhasil menghapus pesan tidak dikenal ${messageId} dari pengguna ${userId} di chat ${chatId}`);
+            } catch (error) {
+              Logger.log(`Gagal menghapus pesan tidak dikenal ${messageId}: ${error}`);
+              // Mungkin bot tidak memiliki izin untuk menghapus pesan
+              sendMessage(chatId, `⚠️ Gagal menghapus pesan Anda. Pastikan bot memiliki izin yang cukup.`, 'HTML');
+            }
       } else if (text.startsWith('/unblock ') && isAdmin(chatId)) {
         const target = text.substring('/unblock '.length).trim();
+       // Tambahkan kode untuk menghapus pesan perintah yang tidak dikenali
+            try {
+              await deleteMessage(chatId, messageId);
+              Logger.log(`Berhasil menghapus pesan tidak dikenal ${messageId} dari pengguna ${userId} di chat ${chatId}`);
+            } catch (error) {
+              Logger.log(`Gagal menghapus pesan tidak dikenal ${messageId}: ${error}`);
+              // Mungkin bot tidak memiliki izin untuk menghapus pesan
+              sendMessage(chatId, `⚠️ Gagal menghapus pesan Anda. Pastikan bot memiliki izin yang cukup.`, 'HTML');
+            }
         if (!isNaN(parseInt(target))) {
           const targetUserId = parseInt(target);
           if (unblockUser(targetUserId)) {
@@ -391,6 +499,15 @@ async function doPost(e) {
       } else if (text === '/listblock') {
         const blockedListMessage = getBlockedList(chatId);
         sendMessage(chatId, blockedListMessage, 'HTML');
+    // Tambahkan kode untuk menghapus pesan perintah yang tidak dikenali
+            try {
+              await deleteMessage(chatId, messageId);
+              Logger.log(`Berhasil menghapus pesan tidak dikenal ${messageId} dari pengguna ${userId} di chat ${chatId}`);
+            } catch (error) {
+              Logger.log(`Gagal menghapus pesan tidak dikenal ${messageId}: ${error}`);
+              // Mungkin bot tidak memiliki izin untuk menghapus pesan
+              sendMessage(chatId, `⚠️ Gagal menghapus pesan Anda. Pastikan bot memiliki izin yang cukup.`, 'HTML');
+            }
       } else {
         // Jika tidak ada perintah yang dikenali dan pengguna bukan admin
         if (!isAdmin(chatId)) {
@@ -411,6 +528,15 @@ async function doPost(e) {
         } else {
           // Jika admin mengirim pesan yang tidak dikenali
           Logger.log(`Pesan tidak dikenali dari admin ${chatId}: ${text}`);
+          // Tambahkan kode untuk menghapus pesan perintah yang tidak dikenali
+            try {
+              await deleteMessage(chatId, messageId);
+              Logger.log(`Berhasil menghapus pesan tidak dikenal ${messageId} dari pengguna ${userId} di chat ${chatId}`);
+            } catch (error) {
+              Logger.log(`Gagal menghapus pesan tidak dikenal ${messageId}: ${error}`);
+              // Mungkin bot tidak memiliki izin untuk menghapus pesan
+              sendMessage(chatId, `⚠️ Gagal menghapus pesan Anda. Pastikan bot memiliki izin yang cukup.`, 'HTML');
+            }
           sendMessage(chatId, 'Perintah tidak dikenali. Silakan coba perintah lain atau ketik /start untuk bantuan.', 'HTML');
         }
       }
